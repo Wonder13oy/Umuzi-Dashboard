@@ -4,7 +4,7 @@ from dash.dependencies import Input, Output
 import dash_core_components as dcc
 import dash_html_components as html
 import plotly.graph_objs as go
-import ipywidgets as widgets
+import dash_table
 
 import numpy
 from datetime import datetime as dt
@@ -14,49 +14,11 @@ import re
 
 from dateutil import parser
 
+#from preprocessing import load_data
+import preprocessing
+#from 
 
-#global df
-df= pd.read_excel('data/Umuzi_Demographics_Aptitude_WebDevTest_(Responses)_short.xlsx', index_col='Timestamp')
-
-def standard_web_dev(department):
-    """
-    used to make coding/web development and web development one department.
-
-    parameters:
-    department (string): a department in umuzi
-    
-    returns:
-    department (string): Web Development or department it got as input 
-    if its not a code/web development
-    """
-
-    if department== 'Coding/Web Development':
-        return 'Web Development'
-    else:
-        return department
-
-
-def get_math_mark(code):
-    """
-    This just searches for a number and returns the fist one
-    as it is the math code
-
-    input:
-    code (str): a string describing the level of their math results range
-    returns:
-    number (str): the first number
-    """
-    code= str(code)
-    #reg= re.compile(r'\d+')
-    matches= re.search(r'\d+', code)
-    if matches:
-        return matches.group() 
-    
-
-#get the clean digit for math level
-df['math_mark_clean']= df['math_mark'].apply(get_math_mark)
-#keep only one variation of web development
-df['department']= df.department.apply(standard_web_dev)
+df= preprocessing.load_data()
 
 app= dash.Dash()
 server= app.server
@@ -136,10 +98,42 @@ app.layout= html.Div([
     ], style={'width':'50%', 'float':'right', 'display':'inline-block'}),
     html.Div(
         id='applicants-table'
-    )
+    ),
+    html.Div([
+    dash_table.DataTable(
+        id='datatable',
+        columns=[{"name": i, "id": i, 'deletable': True} for i in df[['Name', 'Surname', 'department']].columns], 
+        data=df.to_dict('records'),
+        editable=True,
+        filter_action= 'native',
+        #n_fixed_columns=2,
+        style_table={'maxWidth': '1500px'},
+        row_selectable="multi",
+        selected_rows=[0],
+        style_cell = {"fontFamily": "Arial", "size": 10, 'textAlign': 'left'}
+        )
+    ])
 
 #end of main container
 ])
+
+#populate dash table
+@app.callback(Output(component_id='datatable', component_property='data'),
+[Input('Department-Dropdown', 'value')])
+def update_dash_table(departments):
+    USEFUL_COLS= ['department', 'Email Address', 'Cellphone number', 'Name', 'Surname']
+    #qualified
+    #df_table= df[df.math_course=='Mathematics']
+    #of selected departments
+    df_table= df[( df.department.isin(departments) )]
+    df_table= df_table[USEFUL_COLS]
+    
+    #df_table= df_table[(df_table.index>start_date) & (df_table.index<end_date)]
+
+    return df_table.to_dict('records')
+    
+
+
 
 #populate the table
 @app.callback(Output('applicants-table', 'children'),
